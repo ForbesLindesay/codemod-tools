@@ -1,0 +1,32 @@
+{
+  "name": "@codemod-tools/babel-filters",
+  "version": "0.0.0",
+  "description": "",
+  "main": "./lib/index.js",
+  "module": "./lib/index.mjs",
+  "exports": {
+    ".": [
+      {
+        "import": "./lib/index.mjs",
+        "require": "./lib/index.js",
+        "default": "./lib/index.js"
+      },
+      "./lib/index.js"
+    ]
+  },
+  "types": "./lib/index.d.ts",
+  "files": [
+    "./lib/"
+  ],
+  "dependencies": {
+    "@babel/types": "^7.11.0",
+    "babel-walk": "^3.0.0"
+  },
+  "scripts": {},
+  "repository": "https://github.com/ForbesLindesay/codemod-tools/tree/master/packages/babel-filters",
+  "bugs": "https://github.com/ForbesLindesay/codemod-tools/issues",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

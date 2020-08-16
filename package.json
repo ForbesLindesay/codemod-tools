@@ -1,0 +1,61 @@
+{
+  "name": "codemod-tools",
+  "private": true,
+  "@rollingversions/ignore": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall",
+    "prebuild": "wsrun --stages --exclude-missing prebuild",
+    "prebuild:all": "wsrun --stages --exclude-missing prebuild",
+    "build": "node scripts/build-all --only-changed",
+    "build:all": "node scripts/build-all",
+    "postbuild": "wsrun --stages --exclude-missing postbuild",
+    "postbuild:all": "wsrun --stages --exclude-missing postbuild",
+    "prerelease": "yarn build:all",
+    "prettier:check": "prettier --list-different \"packages/*/src/**/*.{ts,tsx}\"",
+    "prettier:write": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
+    "pretest": "yarn build && yarn tslint",
+    "test": "jest",
+    "posttest": "wsrun --parallel --exclude-missing test",
+    "watch:jest": "jest --watch",
+    "clean": "rimraf packages/*/lib && rimraf packages/*/.last_build && rimraf packages/*/.cache && rimraf packages/*/build && rimraf packages/*/node_modules && rimraf node_modules",
+    "tslint": "tslint './packages/*/src/**/*.{js,jsx,ts,tsx}' -t verbose -p ."
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "<rootDir>.*(node_modules)(?!.*codemod-tools.*).*$"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
+    },
+    "testRegex": "/__tests__/.+\\.test\\.(jsx?)$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json"
+    ]
+  },
+  "dependencies": {
+    "@babel/core": "^7.11.1",
+    "@babel/plugin-transform-modules-commonjs": "^7.10.4",
+    "@babel/preset-env": "^7.11.0",
+    "@babel/preset-typescript": "^7.10.4",
+    "@forbeslindesay/tsconfig": "^2.0.0",
+    "@types/jest": "^26.0.9",
+    "builtins": "^3.0.1",
+    "cross-spawn": "^7.0.3",
+    "jest": "^26.3.0",
+    "lsr": "^2.0.0",
+    "mkdirp": "^1.0.4",
+    "prettier": "^2.0.5",
+    "resolve": "^1.17.0",
+    "ts-jest": "^26.1.4",
+    "tslint": "^6.1.3",
+    "typescript": "^3.9.7",
+    "wsrun": "^5.2.1"
+  }
+}
