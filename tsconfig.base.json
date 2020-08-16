@@ -1,0 +1,10 @@
+{
+  "extends": "@forbeslindesay/tsconfig",
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "lib": ["es2020", "dom"],
+    "pretty": true,
+    "sourceMap": false
+  }
+}
