@@ -5,6 +5,7 @@
     "module": "commonjs",
     "lib": ["es2020", "dom"],
     "pretty": true,
-    "sourceMap": false
+    "sourceMap": false,
+    "isolatedModules": true
   }
 }
