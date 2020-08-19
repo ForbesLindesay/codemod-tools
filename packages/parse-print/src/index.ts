@@ -1,5 +1,6 @@
 import {parse as babelParse, ParserOptions} from '@babel/parser';
 import * as t from '@babel/types';
+import template from '@babel/template';
 import analyzeScope, {
   ScopeInfo,
   Scope,
@@ -58,6 +59,11 @@ export default function parse(
   return {
     ...ctx,
     root: pathCTX.path(ast, () => []),
+    template: {
+      statement: template.statement({...opts, ranges: false}).ast,
+      statements: template.statements({...opts, ranges: false}).ast,
+      expression: template.expression({...opts, ranges: false}).ast,
+    },
     print(options) {
       const g = new Generator({
         source: src,
@@ -73,6 +79,11 @@ export default function parse(
 export interface ParsePrint {
   root: Path<t.File>;
   scope: ScopeInfo;
+  template: {
+    statement(tpl: TemplateStringsArray, ...args: any[]): t.Statement;
+    statements(tpl: TemplateStringsArray, ...args: any[]): t.Statement[];
+    expression(tpl: TemplateStringsArray, ...args: any[]): t.Expression;
+  };
   replace(node: t.Node, ...replacements: t.Node[]): void;
   insertBefore(node: t.Node, ...prefixes: t.Node[]): void;
   insertAfter(node: t.Node, ...suffixes: t.Node[]): void;
