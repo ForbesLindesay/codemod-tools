@@ -34,9 +34,9 @@ test('parse', () => {
         
         ${fn.node.id} =     function
         
-          (${fn.node.params.slice().reverse()}) {
+          (${fn.node.params.slice().reverse()}) 
           ${fn.node.body.body}
-        }
+        
       `,
     );
   }
