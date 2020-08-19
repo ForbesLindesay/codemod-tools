@@ -21,6 +21,7 @@
   "dependencies": {
     "@babel/generator": "^7.11.0",
     "@babel/parser": "^7.11.3",
+    "@babel/template": "^7.10.4",
     "@babel/types": "^7.11.0",
     "@codemod-tools/babel-filters": "^0.0.0",
     "@codemod-tools/babel-scope": "^0.0.0",
