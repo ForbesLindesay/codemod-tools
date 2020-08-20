@@ -16,7 +16,7 @@
   },
   "types": "./lib/index.d.ts",
   "files": [
-    "./lib/"
+    "lib/"
   ],
   "dependencies": {
     "@babel/types": "^7.11.0",
