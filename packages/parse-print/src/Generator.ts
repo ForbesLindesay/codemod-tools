@@ -25,7 +25,7 @@ export default class Generator extends Printer {
   private readonly _codemodToolsReplacements: NodeReplacements;
   private readonly _codemodToolsSource: string;
   private readonly _codemodToolsOverrides: PrintOptionsOverride;
-  private readonly _codemodToolsOverridesStack = new Set<t.Node>();
+  private readonly _codemodToolsFormatOverridesStack = new Set<t.Node>();
   constructor({
     options,
     source,
@@ -66,7 +66,7 @@ export default class Generator extends Printer {
 
   protected print(node: t.Node | null, parent?: t.Node): unknown {
     if (!node) return super.print(node, parent);
-    if (!this._codemodToolsOverridesStack.has(node)) {
+    if (!this._codemodToolsFormatOverridesStack.has(node)) {
       const printOverride = getOverrideFormat(
         node,
         this._codemodToolsOverrides,
@@ -74,12 +74,12 @@ export default class Generator extends Printer {
       if (printOverride) {
         const oldFormat = this.format;
         try {
-          this._codemodToolsOverridesStack.add(node);
+          this._codemodToolsFormatOverridesStack.add(node);
           this.format = printOverride;
           return this.print(node, parent);
         } finally {
           this.format = oldFormat;
-          this._codemodToolsOverridesStack.delete(node);
+          this._codemodToolsFormatOverridesStack.delete(node);
         }
       }
     }
@@ -114,6 +114,11 @@ export default class Generator extends Printer {
         }
       }
     }
+    const removed = this._codemodToolsReplacements.resolveRemovals(node);
+    if (removed) {
+      return this.print(removed, parent);
+    }
+
     if (hasRange(node)) {
       this._codemodToolsPrintMode = {
         kind: PrintMode.Chunks,

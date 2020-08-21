@@ -77,3 +77,24 @@ var foo = function (hello) {
 };
 foo(  olleh );`);
 });
+
+test('remove', () => {
+  const code = [
+    // Let's turn this function declaration into a variable declaration.
+    'const a =   10, b =   20, c =   30;',
+    'const foo = "bar", bar = "baz";',
+    'const answer = 42;',
+    '',
+  ].join('\n');
+
+  const {root, print} = parse(code);
+
+  for (const declaration of root.find(filters.VariableDeclaration)) {
+    declaration.get('declarations')[0].remove();
+  }
+
+  expect(print()).toEqual(`const b =   20,
+      c =   30;
+const bar = "baz";
+`);
+});
