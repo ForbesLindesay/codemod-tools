@@ -51,6 +51,7 @@ export default function parse(
   const pathCache = new Map<t.Node, Path<any>>();
   const pathCTX = {
     ...ctx,
+    src,
     path<T extends t.Node>(node: T, parents: () => t.Node[]): Path<T> {
       const cached = pathCache.get(node);
       if (cached) return cached;
@@ -129,6 +130,7 @@ export interface ParsePrint {
 interface PathContext {
   path<T extends t.Node>(node: T, parents: () => t.Node[]): Path<T>;
   scope: ScopeInfo;
+  src: string;
   replace(node: t.Node, ...replacements: t.Node[]): void;
   insertBefore(node: t.Node, ...prefixes: t.Node[]): void;
   insertAfter(node: t.Node, ...suffixes: t.Node[]): void;
@@ -145,20 +147,39 @@ export class Path<T extends t.Node> {
     this._ctx = ctx;
   }
 
+  get source() {
+    // @ts-expect-error
+    const [start, end]: [number, number] = this.node.range;
+    return this._ctx.src.substring(start, end);
+  }
+
   // Update methods
 
   public replace(...replacements: t.Node[]) {
     this._ctx.replace(this.node, ...replacements);
   }
+
   public insertBefore(...prefixes: t.Node[]) {
     this._ctx.insertBefore(this.node, ...prefixes);
   }
+
   public insertAfter(...suffixes: t.Node[]) {
     this._ctx.insertAfter(this.node, ...suffixes);
   }
 
   public overridePrintOptions(options: PrintOptions) {
     this._ctx.overridePrintOptions(this.node, options);
+  }
+
+  public replaceString(this: Path<t.StringLiteral>, value: string) {
+    const source = this.source;
+    const literal = t.stringLiteral(value);
+    this.replace(literal);
+    this._ctx.overridePrintOptions(literal, {
+      strings: {
+        quotes: source[0] === `'` ? 'single' : 'double',
+      },
+    });
   }
 
   // Navigation Methods

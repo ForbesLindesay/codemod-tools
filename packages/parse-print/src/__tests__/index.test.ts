@@ -59,12 +59,18 @@ test('parse', () => {
     }
   }
 
+  // convert all string literals to upper case, leaving
+  // the chosen quote marks in tact
+  for (const str of root.find(filters.StringLiteral)) {
+    str.replaceString(str.node.value.toUpperCase());
+  }
+
   expect(print()).toEqual(`var add = function (b, a) {
   return a   +
     // Weird formatting, huh?
     b;
 };
-export const olleh = "foo"     + ('bar');
+export const olleh = "FOO"     + ('BAR');
 export const dlrow = 32 + \`a \${   1 *   3}\`
 var foo = function (hello) {
   return hello +    dlrow;
