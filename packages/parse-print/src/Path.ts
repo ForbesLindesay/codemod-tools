@@ -86,7 +86,11 @@ export default class Path<T extends t.Node> {
 
   // Navigation Methods
 
-  public get parentPath() {
+  public is<S extends T>(filter: NodeFilter<S>): this is Path<S> {
+    return filter(this.node);
+  }
+
+  public get parentPath(): Path<t.Node> {
     return this._ctx.path(this.parents[0], () => this.parents.slice(1));
   }
 
@@ -115,7 +119,7 @@ export default class Path<T extends t.Node> {
     return value;
   }
 
-  public find<T extends t.Node>(filter: NodeFilter<T>) {
+  public find<T extends t.Node>(filter: NodeFilter<T>): Path<T>[] {
     return filter.find(this.node, (node, parents) =>
       this._ctx.path(node, () => [
         ...parents.slice().reverse().slice(1),
@@ -124,7 +128,9 @@ export default class Path<T extends t.Node> {
     );
   }
 
-  public findClosestParent<T extends t.Node>(filter: NodeFilter<T>) {
+  public findClosestParent<T extends t.Node>(
+    filter: NodeFilter<T>,
+  ): Path<T> | undefined {
     const i = this.parents.findIndex(filter);
     if (i === -1) {
       return undefined;
@@ -134,14 +140,16 @@ export default class Path<T extends t.Node> {
     );
   }
 
-  public findDeclaration(this: Path<t.Identifier>) {
+  public findDeclaration(
+    this: Path<t.Identifier>,
+  ): Path<t.Identifier> | undefined {
     const declaration = this._ctx.scope.declarations.get(this.node);
     return (
       declaration && this._ctx.path(declaration.node, () => declaration.parents)
     );
   }
 
-  public findReferences(this: Path<t.Identifier>) {
+  public findReferences(this: Path<t.Identifier>): Path<t.Identifier>[] {
     const references = this._ctx.scope.references.get(this.node);
     return (references || []).map((r) =>
       this._ctx.path(r.node, () => r.parents),
