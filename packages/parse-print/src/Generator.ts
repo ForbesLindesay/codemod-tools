@@ -10,7 +10,6 @@ enum PrintMode {
 interface PrintChunksMode {
   kind: PrintMode.Chunks;
   startIndex: number;
-  endIndex: number;
 }
 interface PrintAstMode {
   kind: PrintMode.Ast;
@@ -41,6 +40,17 @@ declare class PrinterTypes {
    */
   public generate(ast: t.Node): {code: string};
   protected print(node: t.Node | null, parent?: t.Node): unknown;
+  protected printJoin(
+    nodes: t.Node[],
+    parent: t.Node,
+    opts?: {
+      indent?: boolean;
+      addNewlines?: unknown;
+      statement?: boolean;
+      iterator?: (node: t.Node, index: number) => void;
+      separator?: any;
+    },
+  ): void;
 }
 
 export default class Generator extends (Printer as typeof PrinterTypes) {
@@ -80,6 +90,7 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
     super._maybeIndent(str);
   }
 
+  // adapted from: https://github.com/babel/babel/blob/e498bee10f0123bb208baa228ce6417542a2c3c4/packages/babel-generator/src/printer.js#L465-L494
   protected printJoin(
     nodes: t.Node[],
     parent: t.Node,
@@ -91,68 +102,104 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
       separator?: any;
     } = {},
   ) {
+    if (
+      this._codemodToolsPrintMode.kind === PrintMode.Ast ||
+      // we really cannot support the iterator
+      opts.iterator ||
+      !this._codemodToolsReplacements.isRemovalParent(parent)
+    ) {
+      super.printJoin(nodes, parent, opts);
+      return;
+    }
     if (!nodes?.length) return;
 
     if (opts.indent) this.indent();
+
+    const isNextNodeRemoved = (index: number) => {
+      for (let i = index + 1; i < nodes.length; i++) {
+        if (nodes[i]) {
+          return this._codemodToolsReplacements.isRemoved(parent, nodes[i]);
+        }
+      }
+      return false;
+    };
+    const nextNode = (index: number) => {
+      for (let i = index + 1; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n) {
+          if (!hasRange(n)) {
+            throw new Error('Next node is missing range!');
+          }
+          return n;
+        }
+      }
+      return undefined;
+    };
+    const lastNode = () => {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        if (n) {
+          if (!hasRange(n)) {
+            throw new Error('Next node is missing range!');
+          }
+          return n;
+        }
+      }
+      return undefined;
+    };
+    const isLastNode = (index: number) => {
+      for (let i = index + 1; i < nodes.length; i++) {
+        if (
+          nodes[i] &&
+          !this._codemodToolsReplacements.isRemoved(parent, nodes[i])
+        ) {
+          return false;
+        }
+      }
+      return true;
+    };
 
     const newlineOpts = {
       addNewlines: opts.addNewlines,
     };
 
-    const attemptToReuseOriginalWhitespace = this._codemodToolsReplacements.isRemovalParent(
-      parent,
-    );
-    let previous: t.Node | null = null;
+    if (isNextNodeRemoved(-1)) {
+      this._codemodToolsEnterASTMode(nextNode(-1)!.range[0]);
+    }
+
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
-      if (!node) continue;
-      if (this._codemodToolsReplacements.isRemoved(parent, node)) {
-        previous = null;
+      if (node && this._codemodToolsReplacements.isRemoved(parent, node)) {
         continue;
       }
+      if (!node) continue;
 
-      let next: t.Node | null = null;
-      for (let j = i + 1; j < nodes.length && next === null; j++) {
-        next = nodes[j];
-      }
-      if (next && this._codemodToolsReplacements.isRemoved(parent, next)) {
-        next = null;
-      }
-
-      if (
-        attemptToReuseOriginalWhitespace &&
-        hasRange(previous) &&
-        hasRange(node)
-      ) {
-        this._append(
-          this._codemodToolsSource.slice(previous.range[1], node.range[0]),
-          true,
-        );
-      } else if (opts.statement) {
-        this._printNewline(true, node, parent, newlineOpts);
-      }
+      this._printNewline(true, node, parent, newlineOpts);
 
       this.print(node, parent);
 
       if (
-        attemptToReuseOriginalWhitespace &&
-        hasRange(next) &&
+        this._getMode() === PrintMode.Ast &&
+        !isNextNodeRemoved(i) &&
         hasRange(node)
       ) {
-        // do nothing
-      } else {
-        if (opts.iterator) {
-          opts.iterator(node, i);
-        }
-        if (opts.separator && i < nodes.length - 1) {
-          opts.separator.call(this);
-        }
-        if (opts.statement) {
-          this._printNewline(false, node, parent, newlineOpts);
-        }
+        this._codemodToolsEnterChunksMode(node.range[1]);
+      } else if (
+        this._getMode() === PrintMode.Chunks &&
+        isNextNodeRemoved(i) &&
+        hasRange(node)
+      ) {
+        this._codemodToolsEnterASTMode(node.range[1]);
       }
 
-      previous = node;
+      if (opts.separator && !isLastNode(i)) {
+        opts.separator.call(this);
+      }
+
+      if (opts.statement) this._printNewline(false, node, parent, newlineOpts);
+    }
+    if (this._getMode() === PrintMode.Ast) {
+      this._codemodToolsEnterChunksMode(lastNode()!.range[1]);
     }
 
     if (opts.indent) this.dedent();
@@ -180,21 +227,9 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
       if (!hasRange(node)) {
         throw new Error('Expected original node to have "range".');
       }
-      const {startIndex, endIndex} = this._codemodToolsPrintMode;
-      this._codemodToolsPrintMode = {kind: PrintMode.Ast};
-      // swap mode
-      if (node.range[0] > startIndex) {
-        this._append(
-          this._codemodToolsSource.slice(startIndex, node.range[0]),
-          true,
-        );
-      }
+      this._codemodToolsEnterASTMode(node.range[0]);
       const result = this.print(node, parent);
-      this._codemodToolsPrintMode = {
-        kind: PrintMode.Chunks,
-        startIndex: node.range[1],
-        endIndex,
-      };
+      this._codemodToolsEnterChunksMode(node.range[1]);
       return result;
     }
 
@@ -212,32 +247,42 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
         }
       }
     }
-    const removed = this._codemodToolsReplacements.resolveRemovals(node, {
-      keepChildren: true,
-    });
-    if (removed) {
-      return this.print(removed, parent);
-    }
 
     if (hasRange(node)) {
-      this._codemodToolsPrintMode = {
-        kind: PrintMode.Chunks,
-        startIndex: node.range[0],
-        endIndex: node.range[1],
-      };
+      this._codemodToolsEnterChunksMode(node.range[0]);
       const result = super.print(node, parent);
-      if (this._codemodToolsPrintMode.kind !== PrintMode.Chunks) {
-        throw new Error('Expected print to end in chunks mode.');
-      }
-      const startIndex = this._codemodToolsPrintMode.startIndex;
-      this._codemodToolsPrintMode = {kind: PrintMode.Ast};
-      this._append(
-        this._codemodToolsSource.slice(startIndex, node.range[1]),
-        true,
-      );
+      this._codemodToolsEnterASTMode(node.range[1]);
       return result;
     }
     return super.print(node, parent);
+  }
+
+  private _getMode() {
+    return this._codemodToolsPrintMode.kind;
+  }
+  private _codemodToolsEnterASTMode(astStartIndex: number) {
+    if (this._codemodToolsPrintMode.kind !== PrintMode.Chunks) {
+      throw new Error('Expected to be in chunks mode.');
+    }
+
+    const {startIndex} = this._codemodToolsPrintMode;
+    this._codemodToolsPrintMode = {kind: PrintMode.Ast};
+    // swap mode
+    if (astStartIndex > startIndex) {
+      this._append(
+        this._codemodToolsSource.slice(startIndex, astStartIndex),
+        true,
+      );
+    }
+  }
+  private _codemodToolsEnterChunksMode(chunksModeStart: number) {
+    if (this._codemodToolsPrintMode.kind !== PrintMode.Ast) {
+      throw new Error('Expected to be in ast mode.');
+    }
+    this._codemodToolsPrintMode = {
+      kind: PrintMode.Chunks,
+      startIndex: chunksModeStart,
+    };
   }
 }
 
