@@ -31,8 +31,8 @@ export default class Path<T extends t.Node> {
 
   // Update methods
 
-  public replace(...replacements: t.Node[]) {
-    this._ctx.replacements.replace(this.node, ...replacements);
+  public replace(replacements: t.Node) {
+    this._ctx.replacements.replace(this.node, replacements);
   }
 
   public insertBefore(...prefixes: t.Node[]) {
