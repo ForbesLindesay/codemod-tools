@@ -4,7 +4,8 @@ export default class NodeReplacements {
   private readonly _prefixes = new Map<t.Node, t.Node[]>();
   private readonly _replacements = new Map<t.Node, t.Node[]>();
   private readonly _suffixes = new Map<t.Node, t.Node[]>();
-  private readonly _removals = new Map<t.Node, Map<string, Set<t.Node>>>();
+  private readonly _removals = new Map<t.Node, Set<t.Node>>();
+  private readonly _removalParents = new Map<t.Node, t.Node>();
   public resolve(node: t.Node) {
     const prefix = this._prefixes.get(node);
     const replacement = this._replacements.get(node);
@@ -14,19 +15,29 @@ export default class NodeReplacements {
     }
     return undefined;
   }
-  public resolveRemovals(node: t.Node) {
-    const removals = this._removals.get(node);
-    if (removals) {
+  public isRemovalParent(removalParent: t.Node) {
+    return this._removals.has(removalParent);
+  }
+  public isRemoved(removalParent: t.Node, child: t.Node) {
+    return !!this._removals.get(removalParent)?.has(child);
+  }
+  public resolveRemovals(
+    node: t.Node,
+    {keepChildren = false}: {keepChildren?: boolean} = {},
+  ) {
+    const parent = this._removalParents.get(node);
+    if (parent) {
+      if (keepChildren) {
+        return parent;
+      }
+      const removals = this._removals.get(parent)!;
       return Object.fromEntries(
-        Object.entries(node)
-          .filter(([key]) => key !== 'range')
-          .map(([key, value]) => {
-            const keyRemovals = removals.get(key);
-            if (keyRemovals) {
-              return [key, value.filter((v: t.Node) => !keyRemovals.has(v))];
-            }
-            return [key, value];
-          }),
+        Object.entries(parent).map(([key, value]) => {
+          if (Array.isArray(value)) {
+            return [key, value.filter((v: t.Node) => !removals.has(v))];
+          }
+          return [key, value];
+        }),
       ) as t.Node;
     }
     return undefined;
@@ -71,16 +82,14 @@ export default class NodeReplacements {
         `${parent.type}.${key} does not include the child you asked to remove (of type ${child.type}).`,
       );
     }
-    let removals = this._removals.get(parent);
-    if (!removals) {
-      removals = new Map();
-      this._removals.set(parent, removals);
+    let removalParent = this._removalParents.get(parent);
+    if (!removalParent) {
+      const {range, ...p} = parent as any;
+      removalParent = p as t.Node;
+      this._removalParents.set(parent, removalParent);
+      this._removals.set(removalParent, new Set());
     }
-    let keyRemovals = removals.get(key);
-    if (!keyRemovals) {
-      keyRemovals = new Set();
-      removals.set(key, keyRemovals);
-    }
-    keyRemovals.add(child);
+    const removals = this._removals.get(removalParent)!;
+    removals.add(child);
   }
 }
