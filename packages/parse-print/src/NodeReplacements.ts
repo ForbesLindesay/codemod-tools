@@ -2,17 +2,33 @@ import * as t from '@babel/types';
 
 export default class NodeReplacements {
   private readonly _prefixes = new Map<t.Node, t.Node[]>();
+  // TODO: maybe don't accept an array here
   private readonly _replacements = new Map<t.Node, t.Node[]>();
   private readonly _suffixes = new Map<t.Node, t.Node[]>();
-  private readonly _removals = new Map<t.Node, Map<string, Set<t.Node>>>();
+  private readonly _removals = new Map<t.Node, Set<t.Node>>();
   public resolve(node: t.Node) {
-    const prefix = this._prefixes.get(node);
     const replacement = this._replacements.get(node);
-    const suffix = this._suffixes.get(node);
-    if (prefix || replacement || suffix) {
-      return [...(prefix || []), ...(replacement || [node]), ...(suffix || [])];
+    if (replacement) {
+      return replacement;
     }
     return undefined;
+  }
+  public resolvePrefixes(node: t.Node) {
+    const replacement = this._prefixes.get(node);
+    if (replacement) {
+      return replacement;
+    }
+    return undefined;
+  }
+  public resolveSuffixes(node: t.Node) {
+    const replacement = this._suffixes.get(node);
+    if (replacement) {
+      return replacement;
+    }
+    return undefined;
+  }
+  public isRemoved(removalParent: t.Node, child: t.Node) {
+    return !!this._removals.get(removalParent)?.has(child);
   }
   public resolveRemovals(node: t.Node) {
     const removals = this._removals.get(node);
@@ -21,9 +37,8 @@ export default class NodeReplacements {
         Object.entries(node)
           .filter(([key]) => key !== 'range')
           .map(([key, value]) => {
-            const keyRemovals = removals.get(key);
-            if (keyRemovals) {
-              return [key, value.filter((v: t.Node) => !keyRemovals.has(v))];
+            if (Array.isArray(value)) {
+              return [key, value.filter((v: t.Node) => !removals.has(v))];
             }
             return [key, value];
           }),
@@ -73,14 +88,9 @@ export default class NodeReplacements {
     }
     let removals = this._removals.get(parent);
     if (!removals) {
-      removals = new Map();
+      removals = new Set();
       this._removals.set(parent, removals);
     }
-    let keyRemovals = removals.get(key);
-    if (!keyRemovals) {
-      keyRemovals = new Set();
-      removals.set(key, keyRemovals);
-    }
-    keyRemovals.add(child);
+    removals.add(child);
   }
 }

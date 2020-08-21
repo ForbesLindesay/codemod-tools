@@ -16,12 +16,12 @@
     "prerelease": "yarn build:all",
     "prettier:check": "prettier --list-different \"packages/*/src/**/*.{ts,tsx}\"",
     "prettier:write": "prettier --write \"packages/*/src/**/*.{ts,tsx}\"",
-    "pretest": "yarn build && yarn tslint",
+    "pretest": "yarn build",
     "test": "jest",
     "posttest": "wsrun --parallel --exclude-missing test",
     "watch:jest": "jest --watch",
     "clean": "rimraf packages/*/lib && rimraf packages/*/.last_build && rimraf packages/*/.cache && rimraf packages/*/build && rimraf packages/*/node_modules && rimraf node_modules",
-    "tslint": "tslint './packages/*/src/**/*.{js,jsx,ts,tsx}' -t verbose -p ."
+    "lint": "tslint './packages/*/src/**/*.{js,jsx,ts,tsx}' -t verbose -p ."
   },
   "jest": {
     "transformIgnorePatterns": [

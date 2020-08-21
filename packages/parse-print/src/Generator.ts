@@ -10,14 +10,50 @@ enum PrintMode {
 interface PrintChunksMode {
   kind: PrintMode.Chunks;
   startIndex: number;
-  endIndex: number;
 }
 interface PrintAstMode {
   kind: PrintMode.Ast;
 }
 
-export default class Generator extends Printer {
-  private format: Format;
+declare class PrinterTypes {
+  protected format: Format;
+
+  constructor(format: Format, x: null);
+
+  protected indent(): unknown;
+  protected dedent(): unknown;
+  protected newline(lines?: number): unknown;
+
+  protected _append(str: string, queue?: boolean): void;
+  protected _maybeIndent(str: string): void;
+  protected _printNewline(
+    leading: boolean,
+    node: t.Node,
+    parent: t.Node,
+    opts: unknown,
+  ): void;
+
+  /**
+   * Generate code and sourcemap from ast.
+   *
+   * Appends comments that weren't attached to any node to the end of the generated output.
+   */
+  public generate(ast: t.Node): {code: string};
+  protected print(node: t.Node | null, parent?: t.Node): unknown;
+  protected printJoin(
+    nodes: t.Node[],
+    parent: t.Node,
+    opts?: {
+      indent?: boolean;
+      addNewlines?: unknown;
+      statement?: boolean;
+      iterator?: (node: t.Node, index: number) => void;
+      separator?: any;
+    },
+  ): void;
+}
+
+export default class Generator extends (Printer as typeof PrinterTypes) {
   private readonly _codemodToolsStack = new Set<t.Node>();
   private _codemodToolsPrintMode: PrintChunksMode | PrintAstMode = {
     kind: PrintMode.Ast,
@@ -46,24 +82,114 @@ export default class Generator extends Printer {
 
   protected _append(str: string, queue = false) {
     if (this._codemodToolsPrintMode.kind === PrintMode.Chunks) return;
-    return super._append(str, queue);
+    super._append(str, queue);
   }
 
   protected _maybeIndent(str: string) {
     if (this._codemodToolsPrintMode.kind === PrintMode.Chunks) return;
-    return super._maybeIndent(str);
+    super._maybeIndent(str);
   }
 
-  /**
-   * Generate code and sourcemap from ast.
-   *
-   * Appends comments that weren't attached to any node to the end of the generated output.
-   */
+  // adapted from: https://github.com/babel/babel/blob/e498bee10f0123bb208baa228ce6417542a2c3c4/packages/babel-generator/src/printer.js#L465-L494
+  protected printJoin(
+    nodes: t.Node[],
+    parent: t.Node,
+    opts: {
+      indent?: boolean;
+      addNewlines?: unknown;
+      statement?: boolean;
+      iterator?: (node: t.Node, index: number) => void;
+      separator?: any;
+    } = {},
+  ) {
+    if (
+      this._codemodToolsPrintMode.kind === PrintMode.Ast ||
+      // we really cannot support the iterator
+      opts.iterator
+    ) {
+      super.printJoin(nodes, parent, opts);
+      return;
+    }
+    if (!nodes?.length) return;
 
-  public generate(ast: t.Node) {
-    return super.generate(ast);
+    if (opts.indent) this.indent();
+
+    const realNodes: t.Node[] = [];
+    const isNodeModified = new Set<t.Node>();
+    const isNextNodeModified = new Set<unknown>();
+    const beforeFirstNode = {};
+    let lastNode: unknown = beforeFirstNode;
+    const push = (node: t.Node) => {
+      realNodes.push(node);
+      lastNode = node;
+    };
+    for (const node of nodes) {
+      const prefixes =
+        this._codemodToolsReplacements.resolvePrefixes(node) || [];
+      const isRemoved = this._codemodToolsReplacements.isRemoved(parent, node);
+      const suffixes =
+        this._codemodToolsReplacements.resolveSuffixes(node) || [];
+      for (const n of prefixes) {
+        isNextNodeModified.add(lastNode);
+        isNodeModified.add(n);
+        push(n);
+      }
+      if (isRemoved) {
+        isNextNodeModified.add(lastNode);
+      } else {
+        push(node);
+      }
+      for (const n of suffixes) {
+        isNodeModified.add(n);
+        isNextNodeModified.add(lastNode);
+        push(n);
+      }
+    }
+
+    const newlineOpts = {
+      addNewlines: opts.addNewlines,
+    };
+
+    if (isNextNodeModified.has(beforeFirstNode)) {
+      this._codemodToolsEnterASTMode(nodes.find(hasRange)!.range[0]);
+    }
+
+    for (let i = 0; i < realNodes.length; i++) {
+      const node = realNodes[i];
+
+      this._printNewline(true, node, parent, newlineOpts);
+
+      this.print(node, parent);
+
+      if (
+        this._getMode() === PrintMode.Ast &&
+        !isNextNodeModified.has(node) &&
+        !isNodeModified.has(node) &&
+        hasRange(node)
+      ) {
+        this._codemodToolsEnterChunksMode(node.range[1]);
+      } else if (
+        this._getMode() === PrintMode.Chunks &&
+        isNextNodeModified.has(node) &&
+        hasRange(node)
+      ) {
+        this._codemodToolsEnterASTMode(node.range[1]);
+      }
+
+      if (opts.separator && i < realNodes.length - 1) {
+        opts.separator.call(this);
+      }
+
+      if (opts.statement) this._printNewline(false, node, parent, newlineOpts);
+    }
+    if (this._getMode() === PrintMode.Ast) {
+      this._codemodToolsEnterChunksMode(
+        nodes.slice().reverse().find(hasRange)!.range[1],
+      );
+    }
+
+    if (opts.indent) this.dedent();
   }
-
   protected print(node: t.Node | null, parent?: t.Node): unknown {
     if (!node) return super.print(node, parent);
     if (!this._codemodToolsFormatOverridesStack.has(node)) {
@@ -87,16 +213,9 @@ export default class Generator extends Printer {
       if (!hasRange(node)) {
         throw new Error('Expected original node to have "range".');
       }
-      const {startIndex, endIndex} = this._codemodToolsPrintMode;
-      this._codemodToolsPrintMode = {kind: PrintMode.Ast};
-      // swap mode
-      this._append(this._codemodToolsSource.slice(startIndex, node.range[0]));
+      this._codemodToolsEnterASTMode(node.range[0]);
       const result = this.print(node, parent);
-      this._codemodToolsPrintMode = {
-        kind: PrintMode.Chunks,
-        startIndex: node.range[1],
-        endIndex,
-      };
+      this._codemodToolsEnterChunksMode(node.range[1]);
       return result;
     }
 
@@ -114,32 +233,50 @@ export default class Generator extends Printer {
         }
       }
     }
-    const removed = this._codemodToolsReplacements.resolveRemovals(node);
-    if (removed) {
-      return this.print(removed, parent);
-    }
 
     if (hasRange(node)) {
-      this._codemodToolsPrintMode = {
-        kind: PrintMode.Chunks,
-        startIndex: node.range[0],
-        endIndex: node.range[1],
-      };
+      this._codemodToolsEnterChunksMode(node.range[0]);
       const result = super.print(node, parent);
-      if (this._codemodToolsPrintMode.kind !== PrintMode.Chunks) {
-        throw new Error('Expected print to end in chunks mode.');
-      }
-      const startIndex = this._codemodToolsPrintMode.startIndex;
-      this._codemodToolsPrintMode = {kind: PrintMode.Ast};
-      this._append(this._codemodToolsSource.slice(startIndex, node.range[1]));
+      this._codemodToolsEnterASTMode(node.range[1]);
       return result;
     }
     return super.print(node, parent);
   }
+
+  private _getMode() {
+    return this._codemodToolsPrintMode.kind;
+  }
+  private _codemodToolsEnterASTMode(astStartIndex: number) {
+    if (this._codemodToolsPrintMode.kind !== PrintMode.Chunks) {
+      throw new Error('Expected to be in chunks mode.');
+    }
+
+    const {startIndex} = this._codemodToolsPrintMode;
+    this._codemodToolsPrintMode = {kind: PrintMode.Ast};
+    // swap mode
+    if (astStartIndex > startIndex) {
+      this._append(
+        this._codemodToolsSource.slice(startIndex, astStartIndex),
+        true,
+      );
+    }
+  }
+  private _codemodToolsEnterChunksMode(chunksModeStart: number) {
+    if (this._codemodToolsPrintMode.kind !== PrintMode.Ast) {
+      throw new Error('Expected to be in ast mode.');
+    }
+    this._codemodToolsPrintMode = {
+      kind: PrintMode.Chunks,
+      startIndex: chunksModeStart,
+    };
+  }
 }
 
-function hasRange(node: t.Node): node is t.Node & {range: [number, number]} {
+function hasRange(
+  node: t.Node | null | undefined,
+): node is t.Node & {range: [number, number]} {
   return (
+    node &&
     'range' in node &&
     Array.isArray((node as any).range) &&
     (node as any).range.length === 2 &&
