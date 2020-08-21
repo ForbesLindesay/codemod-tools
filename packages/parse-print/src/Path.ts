@@ -69,7 +69,7 @@ export default class Path<T extends t.Node> {
         parentPath,
         // @ts-expect-error
         parent: this._ctx.replacements.resolveRemovals(parent) || parent,
-        remove: (key: string) =>
+        removeFrom: (key: string) =>
           this._ctx.replacements.remove(
             parent,
             // @ts-expect-error

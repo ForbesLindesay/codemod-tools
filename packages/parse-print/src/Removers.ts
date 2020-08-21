@@ -5,148 +5,148 @@ type Remover<T extends t.Node> = ({
   node,
   parent,
   parentPath,
-  remove,
+  removeFrom,
 }: {
   node: t.Node;
   parent: T;
   parentPath: Path<T>;
-  remove: (key: keyof T) => void;
+  removeFrom: (key: keyof T) => void;
 }) => void;
 
 const Removers: {
   [T in t.Node['type']]?: Remover<Extract<t.Node, {type: T}>>;
 } = {
-  ArrayExpression: ({remove}) => {
-    remove('elements');
+  ArrayExpression: ({removeFrom}) => {
+    removeFrom('elements');
   },
-  ArrowFunctionExpression: ({remove}) => {
-    remove('params');
+  ArrowFunctionExpression: ({removeFrom}) => {
+    removeFrom('params');
   },
-  FunctionDeclaration: ({remove}) => {
-    remove('params');
+  FunctionDeclaration: ({removeFrom}) => {
+    removeFrom('params');
   },
-  FunctionExpression: ({remove}) => {
-    remove('params');
+  FunctionExpression: ({removeFrom}) => {
+    removeFrom('params');
   },
-  ObjectMethod: ({remove}) => {
-    remove('params');
+  ObjectMethod: ({removeFrom}) => {
+    removeFrom('params');
   },
-  BlockStatement: ({remove}) => {
-    remove('body');
+  BlockStatement: ({removeFrom}) => {
+    removeFrom('body');
   },
-  Program: ({remove}) => {
-    remove('body');
+  Program: ({removeFrom}) => {
+    removeFrom('body');
   },
-  ClassBody: ({remove}) => {
-    remove('body');
+  ClassBody: ({removeFrom}) => {
+    removeFrom('body');
   },
-  TSInterfaceBody: ({remove}) => {
-    remove('body');
+  TSInterfaceBody: ({removeFrom}) => {
+    removeFrom('body');
   },
-  TSModuleBlock: ({remove}) => {
-    remove('body');
+  TSModuleBlock: ({removeFrom}) => {
+    removeFrom('body');
   },
-  CallExpression: ({remove}) => {
-    remove('arguments');
+  CallExpression: ({removeFrom}) => {
+    removeFrom('arguments');
   },
-  NewExpression: ({remove}) => {
-    remove('arguments');
+  NewExpression: ({removeFrom}) => {
+    removeFrom('arguments');
   },
-  OptionalCallExpression: ({remove}) => {
-    remove('arguments');
+  OptionalCallExpression: ({removeFrom}) => {
+    removeFrom('arguments');
   },
-  ExportNamedDeclaration: ({node, parent, parentPath, remove}) => {
+  ExportNamedDeclaration: ({node, parent, parentPath, removeFrom}) => {
     if (parent.declaration === node || parent.specifiers.length === 1) {
       parentPath.remove();
     } else {
-      remove('specifiers');
+      removeFrom('specifiers');
     }
   },
   ExpressionStatement: ({parentPath}) => {
     parentPath.remove();
   },
-  ImportDeclaration: ({parent, parentPath, remove}) => {
+  ImportDeclaration: ({parent, parentPath, removeFrom}) => {
     if (parent.specifiers.length === 1) {
       parentPath.remove();
     } else {
-      remove('specifiers');
+      removeFrom('specifiers');
     }
   },
-  JSXElement: ({remove}) => {
-    remove('children');
+  JSXElement: ({removeFrom}) => {
+    removeFrom('children');
   },
-  JSXFragment: ({remove}) => {
-    remove('children');
+  JSXFragment: ({removeFrom}) => {
+    removeFrom('children');
   },
-  JSXOpeningElement: ({remove}) => {
-    remove('attributes');
+  JSXOpeningElement: ({removeFrom}) => {
+    removeFrom('attributes');
   },
   LogicalExpression: ({node, parent, parentPath}) => {
     parentPath.replace(node === parent.left ? parent.right : parent.left);
   },
-  ObjectExpression: ({remove}) => {
-    remove('properties');
+  ObjectExpression: ({removeFrom}) => {
+    removeFrom('properties');
   },
-  ObjectPattern: ({remove}) => {
-    remove('properties');
+  ObjectPattern: ({removeFrom}) => {
+    removeFrom('properties');
   },
-  ObjectTypeAnnotation: ({remove, node}) => {
+  ObjectTypeAnnotation: ({removeFrom, node}) => {
     if (t.isObjectTypeCallProperty(node)) {
-      remove('callProperties');
+      removeFrom('callProperties');
     } else if (t.isObjectTypeIndexer(node)) {
-      remove('indexers');
+      removeFrom('indexers');
     } else {
-      remove('properties');
+      removeFrom('properties');
     }
   },
-  SequenceExpression: ({remove, node, parent, parentPath}) => {
+  SequenceExpression: ({removeFrom, node, parent, parentPath}) => {
     if (parent.expressions.length > 2) {
-      remove('expressions');
+      removeFrom('expressions');
     } else {
       parentPath.replace(parent.expressions.find((p) => p !== node)!);
     }
   },
-  SwitchStatement: ({remove}) => {
-    remove('cases');
+  SwitchStatement: ({removeFrom}) => {
+    removeFrom('cases');
   },
-  TSCallSignatureDeclaration: ({remove}) => {
-    remove('parameters');
+  TSCallSignatureDeclaration: ({removeFrom}) => {
+    removeFrom('parameters');
   },
-  TSConstructSignatureDeclaration: ({remove}) => {
-    remove('parameters');
+  TSConstructSignatureDeclaration: ({removeFrom}) => {
+    removeFrom('parameters');
   },
-  TSConstructorType: ({remove}) => {
-    remove('parameters');
+  TSConstructorType: ({removeFrom}) => {
+    removeFrom('parameters');
   },
-  TSFunctionType: ({remove}) => {
-    remove('parameters');
+  TSFunctionType: ({removeFrom}) => {
+    removeFrom('parameters');
   },
-  TSMethodSignature: ({remove}) => {
-    remove('parameters');
+  TSMethodSignature: ({removeFrom}) => {
+    removeFrom('parameters');
   },
-  TSDeclareFunction: ({remove}) => {
-    remove('params');
+  TSDeclareFunction: ({removeFrom}) => {
+    removeFrom('params');
   },
-  TSDeclareMethod: ({remove}) => {
-    remove('params');
+  TSDeclareMethod: ({removeFrom}) => {
+    removeFrom('params');
   },
-  TSEnumDeclaration: ({remove}) => {
-    remove('members');
+  TSEnumDeclaration: ({removeFrom}) => {
+    removeFrom('members');
   },
-  TSIntersectionType: ({remove}) => {
-    remove('types');
+  TSIntersectionType: ({removeFrom}) => {
+    removeFrom('types');
   },
-  TSUnionType: ({remove}) => {
-    remove('types');
+  TSUnionType: ({removeFrom}) => {
+    removeFrom('types');
   },
-  TSTupleType: ({remove}) => {
-    remove('elementTypes');
+  TSTupleType: ({removeFrom}) => {
+    removeFrom('elementTypes');
   },
-  VariableDeclaration: ({parent, parentPath, remove}) => {
+  VariableDeclaration: ({parent, parentPath, removeFrom}) => {
     if (parent.declarations.length === 1) {
       parentPath.remove();
     } else {
-      remove('declarations');
+      removeFrom('declarations');
     }
   },
 };
