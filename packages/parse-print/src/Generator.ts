@@ -73,13 +73,13 @@ export default class Generator extends Printer {
       );
       if (printOverride) {
         const oldFormat = this.format;
-        this._codemodToolsOverridesStack.add(node);
-        this.format = printOverride;
-        console.info({printOverride, oldFormat});
         try {
+          this._codemodToolsOverridesStack.add(node);
+          this.format = printOverride;
           return this.print(node, parent);
         } finally {
           this.format = oldFormat;
+          this._codemodToolsOverridesStack.delete(node);
         }
       }
     }
