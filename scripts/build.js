@@ -7,6 +7,7 @@ const readdirSync = require('fs').readdirSync;
 const readFileSync = require('fs').readFileSync;
 const unlinkSync = require('fs').unlinkSync;
 const writeFileSync = require('fs').writeFileSync;
+const statSync = require('fs').statSync;
 const resolve = require('path').resolve;
 const dirname = require('path').dirname;
 const {lsrSync} = require('lsr');
@@ -34,17 +35,18 @@ lsrSync(cwd, {
 });
 
 const packageNames = new Set(
-  readdirSync(__dirname + '/../packages').map((dir) => {
-    try {
+  readdirSync(__dirname + '/../packages')
+    .map((dir) => {
+      if (!statSync(__dirname + '/../packages/' + dir).isDirectory()) {
+        return undefined;
+      }
       const src = readFileSync(
         __dirname + '/../packages/' + dir + '/package.json',
         'utf8',
       );
       return JSON.parse(src).name;
-    } catch (ex) {
-      if (ex.code !== 'ENOENT') throw ex;
-    }
-  }),
+    })
+    .filter(Boolean),
 );
 Object.keys(pkg.dependencies || {})
   .concat(Object.keys(pkg.devDependencies || {}))
