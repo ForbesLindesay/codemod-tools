@@ -220,13 +220,11 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
     }
 
     if (!this._codemodToolsStack.has(node)) {
-      const replacements = this._codemodToolsReplacements.resolve(node);
-      if (replacements) {
+      const replacement = this._codemodToolsReplacements.resolve(node);
+      if (replacement) {
         this._codemodToolsStack.add(node);
         try {
-          for (const r of replacements) {
-            this.print(r, parent);
-          }
+          this.print(replacement, parent);
           return undefined;
         } finally {
           this._codemodToolsStack.delete(node);

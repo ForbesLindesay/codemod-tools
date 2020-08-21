@@ -2,8 +2,7 @@ import * as t from '@babel/types';
 
 export default class NodeReplacements {
   private readonly _prefixes = new Map<t.Node, t.Node[]>();
-  // TODO: maybe don't accept an array here
-  private readonly _replacements = new Map<t.Node, t.Node[]>();
+  private readonly _replacements = new Map<t.Node, t.Node>();
   private readonly _suffixes = new Map<t.Node, t.Node[]>();
   private readonly _removals = new Map<t.Node, Set<t.Node>>();
   public resolve(node: t.Node) {
@@ -47,8 +46,8 @@ export default class NodeReplacements {
     return undefined;
   }
 
-  public replace(node: t.Node, ...replacements: t.Node[]) {
-    this._replacements.set(node, replacements);
+  public replace(node: t.Node, replacement: t.Node) {
+    this._replacements.set(node, replacement);
   }
 
   public insertBefore(node: t.Node, ...prefixes: t.Node[]) {
