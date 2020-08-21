@@ -2,20 +2,30 @@ import * as t from '@babel/types';
 
 export default class NodeReplacements {
   private readonly _prefixes = new Map<t.Node, t.Node[]>();
+  // TODO: maybe don't accept an array here
   private readonly _replacements = new Map<t.Node, t.Node[]>();
   private readonly _suffixes = new Map<t.Node, t.Node[]>();
   private readonly _removals = new Map<t.Node, Set<t.Node>>();
   public resolve(node: t.Node) {
-    const prefix = this._prefixes.get(node);
     const replacement = this._replacements.get(node);
-    const suffix = this._suffixes.get(node);
-    if (prefix || replacement || suffix) {
-      return [...(prefix || []), ...(replacement || [node]), ...(suffix || [])];
+    if (replacement) {
+      return replacement;
     }
     return undefined;
   }
-  public isRemovalParent(removalParent: t.Node) {
-    return this._removals.has(removalParent);
+  public resolvePrefixes(node: t.Node) {
+    const replacement = this._prefixes.get(node);
+    if (replacement) {
+      return replacement;
+    }
+    return undefined;
+  }
+  public resolveSuffixes(node: t.Node) {
+    const replacement = this._suffixes.get(node);
+    if (replacement) {
+      return replacement;
+    }
+    return undefined;
   }
   public isRemoved(removalParent: t.Node, child: t.Node) {
     return !!this._removals.get(removalParent)?.has(child);

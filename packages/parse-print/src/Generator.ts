@@ -105,8 +105,7 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
     if (
       this._codemodToolsPrintMode.kind === PrintMode.Ast ||
       // we really cannot support the iterator
-      opts.iterator ||
-      !this._codemodToolsReplacements.isRemovalParent(parent)
+      opts.iterator
     ) {
       super.printJoin(nodes, parent, opts);
       return;
@@ -115,64 +114,48 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
 
     if (opts.indent) this.indent();
 
-    const isNextNodeRemoved = (index: number) => {
-      for (let i = index + 1; i < nodes.length; i++) {
-        if (nodes[i]) {
-          return this._codemodToolsReplacements.isRemoved(parent, nodes[i]);
-        }
-      }
-      return false;
+    const realNodes: t.Node[] = [];
+    const isNodeModified = new Set<t.Node>();
+    const isNextNodeModified = new Set<unknown>();
+    const beforeFirstNode = {};
+    let lastNode: unknown = beforeFirstNode;
+    const push = (node: t.Node) => {
+      realNodes.push(node);
+      lastNode = node;
     };
-    const nextNode = (index: number) => {
-      for (let i = index + 1; i < nodes.length; i++) {
-        const n = nodes[i];
-        if (n) {
-          if (!hasRange(n)) {
-            throw new Error('Next node is missing range!');
-          }
-          return n;
-        }
+    for (const node of nodes) {
+      const prefixes =
+        this._codemodToolsReplacements.resolvePrefixes(node) || [];
+      const isRemoved = this._codemodToolsReplacements.isRemoved(parent, node);
+      const suffixes =
+        this._codemodToolsReplacements.resolveSuffixes(node) || [];
+      for (const n of prefixes) {
+        isNextNodeModified.add(lastNode);
+        isNodeModified.add(n);
+        push(n);
       }
-      return undefined;
-    };
-    const lastNode = () => {
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const n = nodes[i];
-        if (n) {
-          if (!hasRange(n)) {
-            throw new Error('Next node is missing range!');
-          }
-          return n;
-        }
+      if (isRemoved) {
+        isNextNodeModified.add(lastNode);
+      } else {
+        push(node);
       }
-      return undefined;
-    };
-    const isLastNode = (index: number) => {
-      for (let i = index + 1; i < nodes.length; i++) {
-        if (
-          nodes[i] &&
-          !this._codemodToolsReplacements.isRemoved(parent, nodes[i])
-        ) {
-          return false;
-        }
+      for (const n of suffixes) {
+        isNodeModified.add(n);
+        isNextNodeModified.add(lastNode);
+        push(n);
       }
-      return true;
-    };
+    }
 
     const newlineOpts = {
       addNewlines: opts.addNewlines,
     };
 
-    if (isNextNodeRemoved(-1)) {
-      this._codemodToolsEnterASTMode(nextNode(-1)!.range[0]);
+    if (isNextNodeModified.has(beforeFirstNode)) {
+      this._codemodToolsEnterASTMode(nodes.find(hasRange)!.range[0]);
     }
 
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      if (node && this._codemodToolsReplacements.isRemoved(parent, node)) {
-        continue;
-      }
-      if (!node) continue;
+    for (let i = 0; i < realNodes.length; i++) {
+      const node = realNodes[i];
 
       this._printNewline(true, node, parent, newlineOpts);
 
@@ -180,26 +163,29 @@ export default class Generator extends (Printer as typeof PrinterTypes) {
 
       if (
         this._getMode() === PrintMode.Ast &&
-        !isNextNodeRemoved(i) &&
+        !isNextNodeModified.has(node) &&
+        !isNodeModified.has(node) &&
         hasRange(node)
       ) {
         this._codemodToolsEnterChunksMode(node.range[1]);
       } else if (
         this._getMode() === PrintMode.Chunks &&
-        isNextNodeRemoved(i) &&
+        isNextNodeModified.has(node) &&
         hasRange(node)
       ) {
         this._codemodToolsEnterASTMode(node.range[1]);
       }
 
-      if (opts.separator && !isLastNode(i)) {
+      if (opts.separator && i < realNodes.length - 1) {
         opts.separator.call(this);
       }
 
       if (opts.statement) this._printNewline(false, node, parent, newlineOpts);
     }
     if (this._getMode() === PrintMode.Ast) {
-      this._codemodToolsEnterChunksMode(lastNode()!.range[1]);
+      this._codemodToolsEnterChunksMode(
+        nodes.slice().reverse().find(hasRange)!.range[1],
+      );
     }
 
     if (opts.indent) this.dedent();
