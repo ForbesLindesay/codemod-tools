@@ -1,4 +1,4 @@
-import parse, {types as t, filters} from '../index';
+import parse, {types as t, filters, Path} from '../index';
 
 test('parse', () => {
   const code = [
@@ -163,4 +163,22 @@ test('insertAfter', () => {
       'bar();',
     ].join('\n'),
   );
+});
+
+test('union types', () => {
+  const {root} = parse('');
+
+  for (const d of root.find(filters.ImportDeclaration)) {
+    for (const s of d.get('specifiers')) {
+      // @ts-expect-error
+      useImportSpecifier(s);
+      if (!s.is(filters.ImportSpecifier)) {
+        throw new Error('We only support ImportSpecifiers');
+      }
+      useImportSpecifier(s);
+    }
+  }
+  function useImportSpecifier(s: Path<t.ImportSpecifier>) {
+    return s;
+  }
 });

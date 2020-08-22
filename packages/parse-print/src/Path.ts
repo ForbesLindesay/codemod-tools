@@ -99,7 +99,12 @@ export default class Path<T extends t.Node> {
   ): T[TKey] extends t.Node
     ? Path<T[TKey]>
     : T[TKey] extends (infer E)[]
-    ? (E extends t.Node ? Path<E> : E)[]
+    ? (E extends t.Node
+        ? Path<
+            // We have to redo the inference here because we want `Path<t.NodeTypeA | t.NodeTypeB>` not `Path<t.NodeTypeA> | Path<t.NodeTypeB>`
+            T[TKey] extends (infer E)[] ? (E extends t.Node ? E : never) : never
+          >
+        : E)[]
     : T[TKey] {
     let parentsCache: t.Node[] | undefined;
     const parents = () =>
