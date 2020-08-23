@@ -182,3 +182,63 @@ test('union types', () => {
     return s;
   }
 });
+
+test('dealing with CommonJS and ESModules', () => {
+  const code = [
+    'import {unaliasedImport} from "bar";',
+    'import {value as a} from "bar";',
+    'import * as barImport from "bar";',
+
+    'const {unaliasedRequire} = require("bar");',
+    'const {value: b} = require("bar");',
+    'const c = require("bar").value;',
+    'const barRequire = require("bar");',
+
+    'const {value: d} = barImport;',
+    'const e = barImport.value;',
+
+    'const {value: f} = barRequire;',
+    'const g = barRequire.value;',
+
+    'console.log(a, b, c, d, e, f, g);',
+    'console.log(unaliasedImport, unaliasedRequire);',
+  ].join('\n');
+
+  const {root, print} = parse(code, {sourceType: 'module'});
+
+  const bar = {
+    unaliasedImport: t.stringLiteral('Unaliased Import'),
+    unaliasedRequire: t.stringLiteral('Unaliased Require'),
+    value: t.numericLiteral(42),
+  };
+  for (const importDeclaration of [
+    ...root.findImportDeclarations('bar'),
+    ...root.findRequireCalls('bar'),
+  ]) {
+    for (const [name, value] of Object.entries(bar)) {
+      const {
+        references,
+        unsupportedNamespaceReferences,
+        declarations,
+      } = importDeclaration.findPropertyReferences(name);
+      for (const ref of references) {
+        ref.replace(value);
+      }
+      for (const dec of declarations) {
+        dec.remove();
+      }
+      for (const unsupportedNamespaceReference of unsupportedNamespaceReferences) {
+        throw new Error(
+          `Unsupported reference: ${unsupportedNamespaceReference.source}`,
+        );
+      }
+    }
+  }
+
+  expect(print()).toEqual(
+    [
+      'console.log(42, 42, 42, 42, 42, 42, 42);',
+      'console.log("Unaliased Import", "Unaliased Require");',
+    ].join('\n'),
+  );
+});
