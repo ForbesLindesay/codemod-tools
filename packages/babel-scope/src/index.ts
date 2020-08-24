@@ -203,8 +203,7 @@ const secondPass = walk<Context>({
 
     const lastParent = parents[parents.length - 2];
     if (lastParent) {
-      if (!isReference(node, lastParent)) return;
-
+      if (!isReference(node, lastParent, parents[parents.length - 3])) return;
       for (const parent of parentsSorted) {
         if (name === 'arguments' && declaresArguments(parent)) {
           state.argumentsDeclarations.set(node, {
@@ -219,6 +218,9 @@ const secondPass = walk<Context>({
         }
         const declaration = getLocals(state, parent)?.get(name);
         if (declaration) {
+          if (declaration.node === node) {
+            return;
+          }
           state.declarations.set(node, declaration);
           state.references.set(declaration.node, [
             ...(state.references.get(declaration.node) || []),
