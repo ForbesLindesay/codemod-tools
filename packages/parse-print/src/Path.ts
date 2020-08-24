@@ -89,6 +89,16 @@ export default class Path<T extends t.Node> {
   public is<S extends T>(filter: NodeFilter<S>): this is Path<S> {
     return filter(this.node);
   }
+  public isInside(
+    parent: Path<t.Node>,
+    {includeSelf = false}: {includeSelf?: boolean} = {},
+  ) {
+    return (
+      (includeSelf && parent.node === this.node) ||
+      this.parents.includes(parent.node)
+    );
+  }
+
   public map<TResult>(
     mapper: {
       [Type in T['type']]: (path: Path<Extract<T, {type: Type}>>) => TResult;
@@ -155,7 +165,12 @@ export default class Path<T extends t.Node> {
 
   public findClosestParent<T extends t.Node>(
     filter: NodeFilter<T>,
+    {includeSelf = false}: {includeSelf?: boolean} = {},
   ): Path<T> | undefined {
+    if (includeSelf && filter(this.node)) {
+      // @ts-expect-error
+      return this;
+    }
     const i = this.parents.findIndex(filter);
     if (i === -1) {
       return undefined;
@@ -172,6 +187,83 @@ export default class Path<T extends t.Node> {
     return (
       declaration && this._ctx.path(declaration.node, () => declaration.parents)
     );
+  }
+
+  /**
+   * Find the outermost scope in which all identifiers of this expression are declared
+   */
+  public findOuterScope():
+    | Path<
+        t.CatchClause | t.For | t.BlockStatement | t.FunctionParent | t.Program
+      >
+    | undefined {
+    const node = this.node;
+    if (filters.Identifier(node)) {
+      const declaration = this._ctx.scope.declarations.get(node) || {node};
+      const scope = this._ctx.scope.declarationScope.get(declaration.node);
+      return scope && this._ctx.path(scope.node, () => scope.parents);
+    } else {
+      const scopes = new Set<
+        t.CatchClause | t.For | t.BlockStatement | t.FunctionParent | t.Program
+      >();
+      const identifers = this.find(filters.Identifier);
+      for (const identifier of identifers) {
+        const declaration =
+          this._ctx.scope.declarations.get(identifier.node) || identifier;
+        const scope = this._ctx.scope.declarationScope.get(declaration.node);
+        if (scope) {
+          scopes.add(scope.node);
+        }
+      }
+      if (!scopes.size) {
+        return undefined;
+      }
+      let result = this.parentPath;
+      while (
+        !result.is(filters.Program) &&
+        !scopes.has(
+          result.node as
+            | t.CatchClause
+            | t.For
+            | t.BlockStatement
+            | t.FunctionParent
+            | t.Program,
+        )
+      ) {
+        result = result.parentPath;
+      }
+      return result as Path<
+        t.CatchClause | t.For | t.BlockStatement | t.FunctionParent | t.Program
+      >;
+    }
+  }
+
+  public findClosestCommonParent(...paths: Path<t.Node>[]) {
+    return Path.findClosestCommonParent(this, ...paths);
+  }
+
+  public static findClosestCommonParent(
+    path: Path<t.Node>,
+    ...paths: Path<t.Node>[]
+  ) {
+    const candidates = new Set([path.node, ...path.parents]);
+    for (const path of paths) {
+      const intersectionCandidates = new Set([path.node, ...path.parents]);
+      for (const candidate of candidates) {
+        if (!intersectionCandidates.has(candidate)) {
+          candidates.delete(candidate);
+        }
+      }
+    }
+    if (candidates.size) {
+      let candidate = path;
+      while (!candidates.has(candidate.node)) {
+        candidate = candidate.parentPath;
+      }
+      return candidate;
+    } else {
+      return undefined;
+    }
   }
 
   public findReferences(this: Path<t.Identifier>): Path<t.Identifier>[] {
