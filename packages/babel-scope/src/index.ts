@@ -23,8 +23,14 @@ export const declaresArguments = (
 export const declaresThis = declaresArguments;
 
 export interface ScopeInfo {
+  // Map<ReferenceIdentifier, DeclarationIdentifier>
   declarations: Map<t.Identifier, {node: t.Identifier; parents: t.Node[]}>;
+  // Map<DeclarationIdentifier, ReferenceIdentifier>
   references: Map<t.Identifier, {node: t.Identifier; parents: t.Node[]}[]>;
+
+  // Map<DeclarationIdentifier, Scope>
+  declarationScope: Map<t.Identifier, {node: BlockScope; parents: t.Node[]}>;
+
   argumentsDeclarations: Map<
     t.Identifier,
     {node: ThisAndArgumentsScope; parents: t.Node[]}
@@ -33,6 +39,7 @@ export interface ScopeInfo {
     ThisAndArgumentsScope,
     {node: t.Identifier; parents: t.Node[]}[]
   >;
+
   thisDeclarations: Map<
     t.ThisExpression,
     {node: ThisAndArgumentsScope; parents: t.Node[]}
@@ -41,6 +48,7 @@ export interface ScopeInfo {
     ThisAndArgumentsScope,
     {node: t.ThisExpression; parents: t.Node[]}[]
   >;
+
   globals: Map<string, {node: t.Identifier; parents: t.Node[]}[]>;
   globalThisRefrences: {node: t.ThisExpression; parents: t.Node[]}[];
 }
@@ -66,7 +74,13 @@ const setLocal = (
   node: BlockScope,
   id: t.Identifier,
   parents: t.Node[],
-) => declareLocals(ctx, node).set(id.name, {node: id, parents});
+) => {
+  declareLocals(ctx, node).set(id.name, {node: id, parents});
+  ctx.declarationScope.set(id, {
+    node,
+    parents: parents.slice(parents.indexOf(node) + 1),
+  });
+};
 
 const getLocals = (ctx: Context, node: t.Node) =>
   isBlockScope(node) ? ctx.declarationsByName.get(node) : undefined;
@@ -269,6 +283,7 @@ export default function analyzeScope(ast: t.Node): ScopeInfo {
   const result: ScopeInfo = {
     declarations: new Map(),
     references: new Map(),
+    declarationScope: new Map(),
     argumentsDeclarations: new Map(),
     argumentsReferences: new Map(),
     thisDeclarations: new Map(),
