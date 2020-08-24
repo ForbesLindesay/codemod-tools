@@ -72,6 +72,24 @@ const Removers: {
       removeFrom('specifiers');
     }
   },
+  ImportSpecifier: ({parentPath}) => {
+    parentPath.remove();
+  },
+  ImportDefaultSpecifier: ({parentPath}) => {
+    parentPath.remove();
+  },
+  ImportNamespaceSpecifier: ({parentPath}) => {
+    parentPath.remove();
+  },
+  VariableDeclarator: ({node, parent, parentPath}) => {
+    if (parent.id === node) {
+      parentPath.remove();
+    } else {
+      throw new Error(
+        `parse-print does not know how to remove the initial value of ${parent.type}`,
+      );
+    }
+  },
   JSXElement: ({removeFrom}) => {
     removeFrom('children');
   },
@@ -87,8 +105,12 @@ const Removers: {
   ObjectExpression: ({removeFrom}) => {
     removeFrom('properties');
   },
-  ObjectPattern: ({removeFrom}) => {
-    removeFrom('properties');
+  ObjectPattern: ({parent, parentPath, removeFrom}) => {
+    if (parent.properties.length === 1) {
+      parentPath.remove();
+    } else {
+      removeFrom('properties');
+    }
   },
   ObjectTypeAnnotation: ({removeFrom, node}) => {
     if (t.isObjectTypeCallProperty(node)) {
