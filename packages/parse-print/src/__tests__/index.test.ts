@@ -242,3 +242,46 @@ test('dealing with CommonJS and ESModules', () => {
     ].join('\n'),
   );
 });
+
+test('scope regression', () => {
+  const code = ['const {value} = require("bar");', 'console.log(value);'].join(
+    '\n',
+  );
+
+  const {root, print} = parse(code, {sourceType: 'module'});
+
+  const bar = {
+    value: t.numericLiteral(42),
+  };
+  for (const importDeclaration of [
+    ...root.findImportDeclarations('bar'),
+    ...root.findRequireCalls('bar'),
+  ]) {
+    for (const [name, value] of Object.entries(bar)) {
+      const {
+        references,
+        unsupportedNamespaceReferences,
+        declarations,
+      } = importDeclaration.findPropertyReferences(name);
+      for (const ref of references) {
+        if (!ref.parentPath.is(filters.CallExpression)) {
+          throw new Error(
+            'The declaration should not be included in the set of references: ' +
+              ref.parentPath.parentPath.source,
+          );
+        }
+        ref.replace(value);
+      }
+      for (const dec of declarations) {
+        dec.remove();
+      }
+      for (const unsupportedNamespaceReference of unsupportedNamespaceReferences) {
+        throw new Error(
+          `Unsupported reference: ${unsupportedNamespaceReference.source}`,
+        );
+      }
+    }
+  }
+
+  expect(print()).toEqual(['console.log(42);'].join('\n'));
+});
