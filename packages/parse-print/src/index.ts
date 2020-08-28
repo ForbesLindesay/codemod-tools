@@ -1,9 +1,5 @@
 import {parse as babelParse, ParserOptions} from '@babel/parser';
 import * as t from '@babel/types';
-import template, {
-  TemplateBuilder,
-  TemplateBuilderOptions,
-} from '@babel/template';
 import analyzeScope, {
   ScopeInfo,
   Scope,
@@ -19,6 +15,7 @@ import filters, {
   NodeFilter,
   AllFilters,
 } from '@codemod-tools/babel-filters';
+import template, {TemplateHelpers} from './template';
 import {ancestor, AncestorFunction, AncestorVisitor} from 'babel-walk';
 import NodeReplacements from './NodeReplacements';
 import Generator, {PrintOptions, PrintOptionsOverride} from './Generator';
@@ -36,6 +33,9 @@ export {ancestor as walk};
 export {t as types};
 
 export {Path};
+
+export type {TemplateHelpers};
+export {template};
 
 export default function parse(
   src: string,
@@ -68,17 +68,7 @@ export default function parse(
     replace: replacements.replace.bind(replacements),
     insertBefore: replacements.insertBefore.bind(replacements),
     insertAfter: replacements.insertAfter.bind(replacements),
-    template: {
-      statement: syntacticTemplate(
-        template.statement({...opts, ranges: false}),
-      ),
-      statements: syntacticTemplate(
-        template.statements({...opts, ranges: false}),
-      ),
-      expression: syntacticTemplate(
-        template.expression({...opts, ranges: false}),
-      ),
-    },
+    template: template(opts),
     print(options) {
       const g = new Generator({
         source: src,
@@ -98,40 +88,10 @@ export default function parse(
   };
 }
 
-function syntacticTemplate<T>(builder: TemplateBuilder<T>) {
-  const builder2 = builder({
-    syntacticPlaceholders: true,
-  } as TemplateBuilderOptions);
-  const templateFnCache = new WeakMap<
-    TemplateStringsArray,
-    (arg: {[index: string]: unknown}) => T
-  >();
-  return (tpl: TemplateStringsArray, ...args: unknown[]) => {
-    let fn = templateFnCache.get(tpl);
-    if (!fn) {
-      fn = builder2(
-        tpl
-          .map((str, i) => (i === 0 ? str : `%%placeholder${i - 1}%%${str}`))
-          .join(''),
-      );
-      templateFnCache.set(tpl, fn);
-    }
-    const argsObj: {[index: string]: unknown} = {};
-    for (let i = 0; i < args.length; i++) {
-      argsObj[`placeholder${i}`] = args[i];
-    }
-    return fn(argsObj);
-  };
-}
-
 export interface ParsePrint {
   root: Path<t.File>;
   scope: ScopeInfo;
-  template: {
-    statement(tpl: TemplateStringsArray, ...args: unknown[]): t.Statement;
-    statements(tpl: TemplateStringsArray, ...args: unknown[]): t.Statement[];
-    expression(tpl: TemplateStringsArray, ...args: unknown[]): t.Expression;
-  };
+  template: TemplateHelpers;
   replace(node: t.Node, ...replacements: t.Node[]): void;
   insertBefore(node: t.Node, ...prefixes: t.Node[]): void;
   insertAfter(node: t.Node, ...suffixes: t.Node[]): void;
