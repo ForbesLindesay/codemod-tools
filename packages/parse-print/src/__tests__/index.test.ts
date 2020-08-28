@@ -285,3 +285,42 @@ test('scope regression', () => {
 
   expect(print()).toEqual(['console.log(42);'].join('\n'));
 });
+
+test('template with comments', () => {
+  const code = ['const value = 42, negative = -42;'].join('\n');
+
+  const {root, print, template} = parse(code, {sourceType: 'module'});
+
+  for (const declaration of root.find(filters.VariableDeclaration)) {
+    declaration.insertAfter(template.statement`
+      // log the values
+      console.log(${declaration.node.declarations.map((d) => d.id)})
+    `);
+  }
+
+  expect(print()).toEqual(
+    [
+      'const value = 42, negative = -42;',
+      '// log the values',
+      'console.log(value, negative);',
+    ].join('\n'),
+  );
+});
+test('template without comments', () => {
+  const code = ['const value = 42, negative = -42;'].join('\n');
+
+  const {root, print, template} = parse(code, {sourceType: 'module'});
+
+  for (const declaration of root.find(filters.VariableDeclaration)) {
+    declaration.insertAfter(template.statement.withoutComments`
+      // log the values
+      console.log(${declaration.node.declarations.map((d) => d.id)})
+    `);
+  }
+
+  expect(print()).toEqual(
+    ['const value = 42, negative = -42;', 'console.log(value, negative);'].join(
+      '\n',
+    ),
+  );
+});
