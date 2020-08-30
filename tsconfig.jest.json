@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "target": "ES2018",
+    "paths": {
+      "@codemod-tools/*": ["packages/*/src"]
+    }
+  }
+}

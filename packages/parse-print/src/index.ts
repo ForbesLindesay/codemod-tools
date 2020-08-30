@@ -18,8 +18,9 @@ import filters, {
 import template, {TemplateHelpers} from './template';
 import {ancestor, AncestorFunction, AncestorVisitor} from 'babel-walk';
 import NodeReplacements from './NodeReplacements';
-import Generator, {PrintOptions, PrintOptionsOverride} from './Generator';
+import {PrintOptions, PrintOptionsOverride} from './Generator';
 import Path from './Path';
+import prettierPrint from './PrettierGenerator';
 
 export type {ScopeInfo, Scope, BlockScope, ThisAndArgumentsScope};
 export {isScope, isBlockScope, declaresArguments, declaresThis};
@@ -62,28 +63,30 @@ export default function parse(
       return created;
     },
   };
+  const root = pathCTX.path(ast, () => []);
   return {
     ...ctx,
-    root: pathCTX.path(ast, () => []),
+    root,
     replace: replacements.replace.bind(replacements),
     insertBefore: replacements.insertBefore.bind(replacements),
     insertAfter: replacements.insertAfter.bind(replacements),
     template: template(opts),
-    print(options) {
-      const g = new Generator({
-        source: src,
-        replacements,
-        overrides,
-        options: options || {},
-      });
-      const output: string = g.generate(ast).code;
-      if (/\n$/.test(src) && !/\n$/.test(output)) {
-        return `${output}\n`;
-      }
-      if (!/\n$/.test(src) && /\n$/.test(output)) {
-        return output.substr(0, output.length - 1);
-      }
-      return output;
+    print() {
+      // const g = new Generator({
+      //   source: src,
+      //   replacements,
+      //   overrides,
+      //   options: options || {},
+      // });
+      // const output: string = g.generate(ast).code;
+      // if (/\n$/.test(src) && !/\n$/.test(output)) {
+      //   return `${output}\n`;
+      // }
+      // if (!/\n$/.test(src) && /\n$/.test(output)) {
+      //   return output.substr(0, output.length - 1);
+      // }
+      // return output;
+      return prettierPrint(src, root.node, replacements);
     },
   };
 }
