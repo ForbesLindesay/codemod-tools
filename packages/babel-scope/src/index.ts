@@ -184,9 +184,12 @@ const firstPass = walk<Context>({
     }
   },
   ClassDeclaration(node, state, parents) {
+    if (!node.id) {
+      return;
+    }
     for (let i = parents.length - 2; i >= 0; i--) {
       const parent = parents[i];
-      if (isScope(parent) && node.id) {
+      if (isScope(parent)) {
         setLocal(state, parent, node.id, parents.slice().reverse().slice(1));
         return;
       }
